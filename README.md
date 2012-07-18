@@ -26,7 +26,9 @@ for job in jobs:
 
 ## Dependencies
 
-This library uses [httplib2](http://code.google.com/p/httplib2/). Install it with `pip` or `easy_install`:
+This library uses [httplib2](http://code.google.com/p/httplib2/).
+
+It is included with this API for convenience, though you can also install it with `pip` or `easy_install`:
 
 ```
 easy_install httplib2

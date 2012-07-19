@@ -1,5 +1,19 @@
 # ZYNC Python API
 
+## Install / Setup
+
+Clone this repository to a centrally available location at your facility. This library will be used by both the Maya and Nuke plugins, so it must be easily accessible.
+
+Once cloned, create a new file zync-python/config.py. This file should contain one line:
+
+```
+ZYNC_URL = "https://<site>.zyncio.com"
+```
+
+This address will match the address you use to access your ZYNC Web Console.
+
+A sample configuration file "config.py.sample" is included in this repository.
+
 ## Usage
 
 ```python

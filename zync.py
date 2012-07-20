@@ -76,32 +76,14 @@ def get_project_name( in_file ):
     Takes the name of a file - either a Maya or Nuke script - and returns
     the name of the project it belongs to.
     """
-    for client_path in SERVER_PATHS:
-	if in_file[:len(client_path)] == client_path:
-		in_file = in_file[len(client_path):]
-    if in_file.startswith(CONFIG["BROWSE_DIR"]):
-        in_file = in_file[len(CONFIG["BROWSE_DIR"]):]
     http = httplib2.Http()
     resp, content = http.request( "%s/lib/get_project_name.php?file=%s" % ( ZYNC_URL, in_file ), 'GET' )
     return json.loads(content)
 
 def get_maya_output_path( in_file ):
-    for client_path in SERVER_PATHS:
-	if in_file[:len(client_path)] == client_path:
-		in_file = in_file[len(client_path):]
-    if in_file.startswith(CONFIG["BROWSE_DIR"]):
-        in_file = in_file[len(CONFIG["BROWSE_DIR"]):]
     http = httplib2.Http()
     resp, content = http.request( "%s/lib/get_maya_output.php?file=%s" % ( ZYNC_URL, in_file ), 'GET' )
-    resp_obj = json.loads(content)
-    if resp_obj["code"] == 0:
-        if platform.system() in ( "Windows", "Microsoft" ):
-            resp_obj["response"] = "%s%s%s" % ( CONFIG["WIN_ROOT"], CONFIG["BROWSE_DIR"], resp_obj["response"] )
-        elif platform.system() in ( "Darwin" ):
-            resp_obj["response"] = "%s%s%s" % ( CONFIG["MAC_ROOT"], CONFIG["BROWSE_DIR"], resp_obj["response"] )
-        else:
-            resp_obj["response"] = "%s%s%s" % ( CONFIG["FILE_ROOT"], CONFIG["BROWSE_DIR"], resp_obj["response"] )
-    return resp_obj
+    return json.loads(content)
 
 class HTTPBackend(object):
     """

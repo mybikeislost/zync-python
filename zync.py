@@ -370,20 +370,21 @@ class NukeJob(Job):
         """
         #script_path = os.path.realpath(script_path)
 
-	for path in SERVER_PATHS:
-		if script_path.find( path ) != -1:
-			script_path = script_path.split( path )[-1]
+	#for path in SERVER_PATHS:
+	#	if script_path.find( path ) != -1:
+	#		script_path = script_path.split( path )[-1]
 
-	if script_path.startswith(CONFIG["BROWSE_DIR"]):
-		script_path = script_path[len(CONFIG["BROWSE_DIR"]):]
+	#if script_path.startswith(CONFIG["BROWSE_DIR"]):
+	#	script_path = script_path[len(CONFIG["BROWSE_DIR"]):]
 	
         submit_params = {}
         submit_params['job_type'] = 'Nuke'
         submit_params['write_node'] = write_name
 
-	script_split = script_path.split("/")
+	#script_split = script_path.split("/")
 
-	submit_params['file'] = "%s%s%s" % ( CONFIG["FILE_ROOT"], CONFIG["BROWSE_DIR"], script_path )
+	#submit_params['file'] = "%s%s%s" % ( CONFIG["FILE_ROOT"], CONFIG["BROWSE_DIR"], script_path )
+	submit_params['file'] = script_path 
 
         if params:
             submit_params.update(params)

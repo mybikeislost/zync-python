@@ -28,10 +28,13 @@ dummy.request( ZYNC_URL )
 def get_config( var=None ):
     http = httplib2.Http()
     url = "%s/lib/get_config_api.php" % ( ZYNC_URL, )
-    if var != None:
+    if var == None:
+        resp, content = http.request( url, 'GET' )
+        return json.loads(content)
+    else:
         url += "?var=%s" % ( var, )
-    resp, content = http.request( url, 'GET' )
-    return json.loads(content)
+        resp, content = http.request( url, 'GET' )
+        return content
 
 CONFIG = get_config()
 SERVER_PATHS = [ CONFIG["WIN_ROOT"], CONFIG["MAC_ROOT"] ]

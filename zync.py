@@ -11,7 +11,10 @@ import platform
 from urllib import urlencode
 import os
 
-config_path = "%s/config.py" % ( os.path.dirname(__file__), )
+config_path = os.path.dirname( __file__ )
+if config_path != "":
+    config_path += "/"
+config_path += "config.py"
 if not os.path.exists( config_path ):
     raise Exception( "Could not locate config.py, please create." )
 from config import *
@@ -23,7 +26,7 @@ for key in required_config:
         raise Exception( "config.py must define a value for %s." % ( key, ) )
 
 dummy = httplib2.Http()
-dummy.request( ZYNC_URL )
+dummy.request(ZYNC_URL, headers={'connection': 'close'})
 
 def get_config( var=None ):
     http = httplib2.Http()
@@ -92,14 +95,14 @@ class HTTPBackend(object):
     """
     Methods for talking to services over http.
     """
-    def __init__(self, username, password, timeout=2.0):
+    def __init__(self, script_name, token, username=None, password=None, timeout=2.0):
         """
         """
         self.url = ZYNC_URL
         self.http = httplib2.Http(timeout=timeout) 
 
         if self.up():
-            self.cookie = self.__auth(username, password)
+            self.cookie = self.__auth(script_name, token, username=username, password=password)
         else:
             raise ZyncError('ZYNC is down at URL: %s' % self.url)
 
@@ -129,32 +132,34 @@ class HTTPBackend(object):
         else:
             return 'down'
 
-    def __auth(self, username, password):
+    def __auth(self, script_name, token, username=None, password=None):
         """
         Authenticate with zync
         """
         url = '/'.join((self.url, 'validate.php'))
-        data = urlencode({'user': username, 'pass': password})
+        args = { 'script_name': script_name, 'token': token }
+        if username != None:
+            args['user'] = username
+            args['pass'] = password
+        data = urlencode(args)
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         resp, content = self.http.request(url, 'POST', data, headers=headers)
-
-        return resp.get('set-cookie')
+        response_obj = json.loads( content )
+        if response_obj["code"] == 0:
+            return resp.get('set-cookie')
+        else:
+            raise ZyncAuthenticationError( response_obj["response"] )
 
 class Zync(HTTPBackend):
     """
     The entry point to the ZYNC service. Initialize this with your username
     and password.
     """
-    def __init__(self, username, password, app='nuke', timeout=2.0):
+    def __init__(self, script_name, token, username=None, password=None, timeout=2.0):
         """
         Create a Zync object, for interacting with the ZYNC service
         """
-        super(Zync, self).__init__(username, password, timeout)
-
-        self.app = app.lower()
-
-        JobSelect = NukeJob if self.app == 'nuke' else MayaJob
-        self.job = JobSelect(self.cookie, self.url)
+        super(Zync, self).__init__(script_name, token, username=username, password=password, timeout=timeout)
 
         self.path_mappings = []
 
@@ -190,9 +195,17 @@ class Zync(HTTPBackend):
         params = dict(max=max)
         url = '?'.join((url, urlencode(params)))
         resp, content = self.http.request(url, 'GET')
+        print content
 
         return load_json(content)
 
+    def submit_job(self, job_type, *args, **kwargs):
+        job_type = job_type.lower()
+
+        JobSelect = NukeJob if job_type == 'nuke' else MayaJob
+        self.job = JobSelect(self.cookie, self.url)
+
+        self.job.submit(*args, **kwargs)
 
     def submit(self, *args, **kwargs):
         """
@@ -209,6 +222,9 @@ class Zync(HTTPBackend):
             kwargs['params'] = file_params
 
         return self.job.submit(*args, **kwargs)
+
+    def get_triggers():
+        pass
 
 class Job(object):
     """
@@ -343,8 +359,7 @@ class Job(object):
         # we want to raise that so that users can deal with it
         # (if it works, nothing will be returned)
         if content:
-            info = '\n'.join([content, params])
-            raise ZyncError(info)
+            raise ZyncError( content )
         else:
             return resp, content
 

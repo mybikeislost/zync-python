@@ -11,12 +11,18 @@ import platform
 from urllib import urlencode
 import os
 
-config_path = os.path.dirname( __file__ )
+class ZyncAuthenticationError(Exception):
+    pass
+
+class ZyncError(Exception):
+    pass
+
+config_path = os.path.dirname(__file__)
 if config_path != "":
     config_path += "/"
 config_path += "config.py"
 if not os.path.exists( config_path ):
-    raise Exception( "Could not locate config.py, please create." )
+    raise ZyncError( "Could not locate config.py, please create." )
 from config import *
 
 required_config = [ "ZYNC_URL" ]
@@ -33,7 +39,10 @@ def get_config( var=None ):
     url = "%s/lib/get_config_api.php" % ( ZYNC_URL, )
     if var == None:
         resp, content = http.request( url, 'GET' )
-        return json.loads(content)
+        try:
+            return json.loads(content)
+        except ValueError:
+            raise ZyncError( content )
     else:
         url += "?var=%s" % ( var, )
         resp, content = http.request( url, 'GET' )
@@ -450,9 +459,4 @@ class MayaJob(Job):
 
         return super(MayaJob, self).submit(submit_params)
 
-class ZyncAuthenticationError(Exception):
-    pass
-
-class ZyncError(Exception):
-    pass
 

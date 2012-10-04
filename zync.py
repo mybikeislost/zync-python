@@ -204,7 +204,6 @@ class Zync(HTTPBackend):
         params = dict(max=max)
         url = '?'.join((url, urlencode(params)))
         resp, content = self.http.request(url, 'GET')
-        print content
 
         return load_json(content)
 
@@ -232,8 +231,22 @@ class Zync(HTTPBackend):
 
         return self.job.submit(*args, **kwargs)
 
-    def get_triggers():
-        pass
+    def get_triggers(self, user=None, show_seen=False):
+        """
+        Returns a list of current trigger events in ZYNC
+        """
+        url  = '/'.join((self.url, 'lib', 'get_triggers.php'))
+        params = {}
+        if show_seen == True:
+            params["show_seen"] = 1
+        else:
+            params["show_seen"] = 0
+        if user != None:
+            params["user"] = user
+        url = '?'.join((url, urlencode(params)))
+        resp, content = self.http.request(url, 'GET')
+
+        return json.loads(content)
 
 class Job(object):
     """

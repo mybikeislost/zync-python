@@ -25,6 +25,7 @@ z = zync.Zync('script_name', 'api_key', username='bcipriano', password='password
 # supply some non-default rendering paramters
 params = dict( frange = '1-100',
                chunk_size = 2 )
+
 # submit the job to ZYNC
 z.submit_job( 'nuke', '/path/to/nuke_script.nk', 'write_node', job_params)
 ```

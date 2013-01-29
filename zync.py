@@ -359,7 +359,7 @@ class Job(object):
         submit_params = {}
         submit_params['instance_type'] = DEFAULT_INSTANCE_TYPE
         submit_params['upload_only'] = 0
-        submit_params['start_new_instances'] = 1
+        submit_params['start_new_slots'] = 1
         submit_params['chunk_size'] = 1
         submit_params['distributed'] = 0
         submit_params['num_instances'] = 1

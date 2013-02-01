@@ -61,7 +61,7 @@ def get_instance_types():
 
 INSTANCE_TYPES = get_instance_types()
 
-DEFAULT_INSTANCE_TYPE = '20x7'
+DEFAULT_INSTANCE_TYPE = 'ZYNC20'
 
 VRAY_RENDERER = 'vray'
 SOFTWARE_RENDERER = 'sw'

@@ -18,48 +18,18 @@ class ZyncError(Exception):
     pass
 
 config_path = os.path.dirname(__file__)
-if config_path != "":
-    config_path += "/"
-config_path += "config.py"
-if not os.path.exists( config_path ):
-    raise ZyncError( "Could not locate config.py, please create." )
+if config_path != '':
+    config_path += '/'
+config_path += 'config.py'
+if not os.path.exists(config_path):
+    raise ZyncError('Could not locate config.py, please create.')
 from config import *
 
-required_config = [ "ZYNC_URL" ]
+required_config = ['ZYNC_URL']
 
 for key in required_config:
     if not key in globals():
-        raise Exception( "config.py must define a value for %s." % ( key, ) )
-
-dummy = httplib2.Http()
-dummy.request(ZYNC_URL, headers={'connection': 'close'})
-
-def get_config( var=None ):
-    http = httplib2.Http()
-    url = "%s/lib/get_config_api.php" % ( ZYNC_URL, )
-    if var == None:
-        resp, content = http.request( url, 'GET' )
-        try:
-            return json.loads(content)
-        except ValueError:
-            raise ZyncError( content )
-    else:
-        url += "?var=%s" % ( var, )
-        resp, content = http.request( url, 'GET' )
-        return content
-
-CONFIG = get_config()
-SERVER_PATHS = [ CONFIG["WIN_ROOT"], CONFIG["MAC_ROOT"] ]
-
-def get_instance_types():
-    http = httplib2.Http()
-    resp, content = http.request( "%s/lib/get_instance_types.php" % ( ZYNC_URL, ), 'GET' )
-    response_obj = json.loads(content)
-    if response_obj["code"] == 1:
-        raise Exception( "Could not retrieve list of instance types: %s" % ( response_obj["response"], ) )
-    return response_obj["response"]
-
-INSTANCE_TYPES = get_instance_types()
+        raise Exception('config.py must define a value for %s.' % (key,))
 
 DEFAULT_INSTANCE_TYPE = 'ZYNC20'
 
@@ -86,32 +56,25 @@ def load_json(content):
 
     return json.loads(content)
 
-def get_project_name( in_file ):
-    """
-    Takes the name of a file - either a Maya or Nuke script - and returns
-    the name of the project it belongs to.
-    """
-    http = httplib2.Http()
-    resp, content = http.request( "%s/lib/get_project_name.php?file=%s" % ( ZYNC_URL, in_file ), 'GET' )
-    return json.loads(content)
-
-def get_maya_output_path( in_file ):
-    http = httplib2.Http()
-    resp, content = http.request( "%s/lib/get_maya_output.php?file=%s" % ( ZYNC_URL, in_file ), 'GET' )
-    return json.loads(content)
-
 class HTTPBackend(object):
     """
     Methods for talking to services over http.
     """
-    def __init__(self, script_name, token, username=None, password=None, timeout=2.0):
+    def __init__(self, script_name, token, timeout=2.0):
         """
         """
         self.url = ZYNC_URL
         self.http = httplib2.Http(timeout=timeout) 
-
+        self.script_name = script_name
+        self.token = token
         if self.up():
-            self.cookie = self.__auth(script_name, token, username=username, password=password)
+            self.cookie = self.__auth(self.script_name, self.token)
+        else:
+            raise ZyncError('ZYNC is down at URL: %s' % self.url)
+
+    def login(self, username=None, password=None):
+        if self.up():
+            self.cookie = self.__auth(self.script_name, self.token, username=username, password=password)
         else:
             raise ZyncError('ZYNC is down at URL: %s' % self.url)
 
@@ -141,6 +104,17 @@ class HTTPBackend(object):
         else:
             return 'down'
 
+    def set_cookie(self, headers={}):
+        """
+        Adds the auth cookie to the given headers, raises
+        ZyncAuthenticationError if cookie doesn't exist
+        """
+        if self.cookie:
+            headers['Cookie'] = self.cookie
+            return headers
+        else:
+            raise ZyncAuthenticationError('ZYNC Auth Failed')
+
     def __auth(self, script_name, token, username=None, password=None):
         """
         Authenticate with zync
@@ -164,13 +138,16 @@ class Zync(HTTPBackend):
     The entry point to the ZYNC service. Initialize this with your username
     and password.
     """
-    def __init__(self, script_name, token, username=None, password=None, timeout=2.0):
+    def __init__(self, script_name, token, timeout=2.0):
         """
         Create a Zync object, for interacting with the ZYNC service
         """
-        super(Zync, self).__init__(script_name, token, username=username, password=password, timeout=timeout)
+        super(Zync, self).__init__(script_name, token, timeout=timeout)
 
         self.path_mappings = []
+        self.CONFIG = self.get_config()
+        self.SERVER_PATHS = [self.CONFIG['WIN_ROOT'], self.CONFIG['MAC_ROOT']]
+        self.INSTANCE_TYPES = self.get_instance_types()
 
     def add_path_mapping(self, from_path, to_replace):
         """
@@ -206,6 +183,45 @@ class Zync(HTTPBackend):
         resp, content = self.http.request(url, 'GET')
 
         return load_json(content)
+
+    def get_project_name(self, in_file):
+        """
+        Takes the name of a file - either a Maya or Nuke script - and returns
+        the name of the project it belongs to.
+        """
+        url = '%s/lib/get_project_name.php?file=%s' % (ZYNC_URL, in_file)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        return load_json(content)
+
+    def get_maya_output_path(self, in_file):
+        url = '%s/lib/get_maya_output.php?file=%s' % (ZYNC_URL, in_file)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        return load_json(content)
+
+    def get_config(self, var=None):
+        url = '%s/lib/get_config_api.php' % (ZYNC_URL,)
+        headers = self.set_cookie()
+        if var == None:
+            resp, content = self.http.request(url, 'GET', headers=headers)
+            try:
+                return load_json(content)
+            except ValueError:
+                raise ZyncError(content)
+        else:
+            url += '?var=%s' % (var,)
+            resp, content = self.http.request(url, 'GET', headers=headers)
+            return content
+
+    def get_instance_types(self):
+        url = '%s/lib/get_instance_types.php' % (ZYNC_URL,)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        response_obj = load_json(content)
+        if response_obj['code'] == 1:
+            raise ZyncError('Could not retrieve list of instance types: %s' % (response_obj["response"],))
+        return response_obj['response']
 
     def submit_job(self, job_type, *args, **kwargs):
         job_type = job_type.lower()

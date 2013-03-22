@@ -144,34 +144,8 @@ class Zync(HTTPBackend):
         """
         super(Zync, self).__init__(script_name, token, timeout=timeout)
 
-        self.path_mappings = []
         self.CONFIG = self.get_config()
-        self.SERVER_PATHS = [self.CONFIG['WIN_ROOT'], self.CONFIG['MAC_ROOT']]
         self.INSTANCE_TYPES = self.get_instance_types()
-
-    def add_path_mapping(self, from_path, to_replace):
-        """
-        Adds a path mapping that will be executed when a job is submitted.
-        """
-        self.path_mappings.append((from_path, to_replace))
-
-    def add_path_mappings(self, mappings):
-        """
-        Adds multiple path mappings in the form of two-tuples:
-                [ (from_path, to_path), ... ]
-        """
-        for from_path, to_path in mappings:
-            self.add_path_mapping(from_path, to_path)
-
-    def apply_mapping(self, input):
-        """
-        Cycles through all of the registered `self.path_mapping` items and
-        applies them to the input.
-        """
-        for from_path, to_path in self.path_mappings:
-            input = input.replace(from_path, to_path)
-
-        return input
 
     def list(self, max=100, app=None):
         """
@@ -236,15 +210,6 @@ class Zync(HTTPBackend):
         Wraps the submit method for the initialized job object.
         See the documentation for `NukeJob.submit()` and `MayaJob.submit()`
         """
-        file_params = kwargs.get('params', ())
-        if file_params:
-            for k in file_params:
-                try:
-                    file_params[k] = self.apply_mapping(file_params[k])
-                except AttributeError:
-                    continue
-            kwargs['params'] = file_params
-
         return self.job.submit(*args, **kwargs)
 
     def get_triggers(self, user=None, show_seen=False):
@@ -426,20 +391,10 @@ class NukeJob(Job):
         """
         #script_path = os.path.realpath(script_path)
 
-	#for path in SERVER_PATHS:
-	#	if script_path.find( path ) != -1:
-	#		script_path = script_path.split( path )[-1]
-
-	#if script_path.startswith(CONFIG["BROWSE_DIR"]):
-	#	script_path = script_path[len(CONFIG["BROWSE_DIR"]):]
-	
         submit_params = {}
         submit_params['job_type'] = 'Nuke'
         submit_params['write_node'] = write_name
 
-	#script_split = script_path.split("/")
-
-	#submit_params['file'] = "%s%s%s" % ( CONFIG["FILE_ROOT"], CONFIG["BROWSE_DIR"], script_path )
 	submit_params['file'] = script_path 
 
         if params:

@@ -146,6 +146,7 @@ class Zync(HTTPBackend):
 
         self.CONFIG = self.get_config()
         self.INSTANCE_TYPES = self.get_instance_types()
+        self.FEATURES = self.get_enabled_features()
 
     def list(self, max=100, app=None):
         """
@@ -195,6 +196,15 @@ class Zync(HTTPBackend):
         response_obj = load_json(content)
         if response_obj['code'] == 1:
             raise ZyncError('Could not retrieve list of instance types: %s' % (response_obj["response"],))
+        return response_obj['response']
+
+    def get_enabled_features(self):
+        url = '%s/lib/get_enabled_features.php' % (ZYNC_URL,)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        response_obj = load_json(content)
+        if response_obj['code'] == 1:
+            raise ZyncError('Could not retrieve list of enabled features: %s' % (response_obj["response"],))
         return response_obj['response']
 
     def submit_job(self, job_type, *args, **kwargs):

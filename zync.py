@@ -5,8 +5,7 @@ A module for interacting with ZYNC.
 """
 
 import json
-import httplib
-import httplib2
+import zync_lib.httplib2
 import platform
 from urllib import urlencode
 import os
@@ -64,7 +63,7 @@ class HTTPBackend(object):
         """
         """
         self.url = ZYNC_URL
-        self.http = httplib2.Http(timeout=timeout) 
+        self.http = zync_lib.httplib2.Http(timeout=timeout) 
         self.script_name = script_name
         self.token = token
         if self.up():
@@ -84,7 +83,7 @@ class HTTPBackend(object):
         """
         try:
             data = self.http.request(self.url, 'GET')
-        except httplib2.ServerNotFoundError:
+        except zync_lib.httplib2.ServerNotFoundError:
             return False
         except AttributeError:
             # trying to make a socket failes sometimes when connecting
@@ -254,7 +253,7 @@ class Job(object):
             raise ZyncAuthenticationError('ZYNC Auth Failed')
 
         self.url = url
-        self.http = httplib2.Http()
+        self.http = zync_lib.httplib2.Http()
 
     def set_cookie(self, headers, cookie=None):
         """

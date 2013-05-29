@@ -97,7 +97,7 @@ class HTTPBackend(object):
         Checks the server status
         """
         if self.up():
-            url = '/'.join((self.url, 'lib', 'check_server.php'))
+            url = '%s/lib/check_server.php' % (self.url,)
             resp, status = self.http.request(url, 'GET')
             return status
         else:
@@ -118,7 +118,7 @@ class HTTPBackend(object):
         """
         Authenticate with zync
         """
-        url = '/'.join((self.url, 'validate.php'))
+        url = '%s/validate.php' % (self.url,)
         args = { 'script_name': script_name, 'token': token }
         if username != None:
             args['user'] = username
@@ -151,7 +151,7 @@ class Zync(HTTPBackend):
         """
         Returns a list of all of the jobs on Zync
         """
-        url  = '/'.join((ZYNC_URL, 'lib', 'get_jobs.php'))
+        url = '%s/lib/get_jobs.php' % (self.url,)
         params = dict(max=max)
         url = '?'.join((url, urlencode(params)))
         resp, content = self.http.request(url, 'GET', headers=headers) 
@@ -163,19 +163,19 @@ class Zync(HTTPBackend):
         Takes the name of a file - either a Maya or Nuke script - and returns
         the name of the project it belongs to.
         """
-        url = '%s/lib/get_project_name.php?file=%s' % (ZYNC_URL, in_file)
+        url = '%s/lib/get_project_name.php?file=%s' % (self.url, in_file)
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         return load_json(content)
 
     def get_maya_output_path(self, in_file):
-        url = '%s/lib/get_maya_output.php?file=%s' % (ZYNC_URL, in_file)
+        url = '%s/lib/get_maya_output.php?file=%s' % (self.url, in_file)
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         return load_json(content)
 
     def get_config(self, var=None):
-        url = '%s/lib/get_config_api.php' % (ZYNC_URL,)
+        url = '%s/lib/get_config_api.php' % (self.url,)
         headers = self.set_cookie()
         if var == None:
             resp, content = self.http.request(url, 'GET', headers=headers)
@@ -189,7 +189,7 @@ class Zync(HTTPBackend):
             return content
 
     def get_instance_types(self):
-        url = '%s/lib/get_instance_types.php' % (ZYNC_URL,)
+        url = '%s/lib/get_instance_types.php' % (self.url,)
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         response_obj = load_json(content)
@@ -198,7 +198,7 @@ class Zync(HTTPBackend):
         return response_obj['response']
 
     def get_enabled_features(self):
-        url = '%s/lib/get_enabled_features.php' % (ZYNC_URL,)
+        url = '%s/lib/get_enabled_features.php' % (self.url,)
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         response_obj = load_json(content)
@@ -206,8 +206,8 @@ class Zync(HTTPBackend):
             raise ZyncError('Could not retrieve list of enabled features: %s' % (response_obj["response"],))
         return response_obj['response']
 
-    def get_job_params(self, jobid):
-        url = '%s/lib/get_job_params.php?job_id=%d' % (ZYNC_URL,jobid,)
+    def get_job_params(self, job_id):
+        url = '%s/lib/get_job_params.php?job_id=%d' % (self.url, job_id)
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         return content
@@ -231,7 +231,7 @@ class Zync(HTTPBackend):
         """
         Returns a list of current trigger events in ZYNC
         """
-        url  = '/'.join((self.url, 'lib', 'get_triggers.php'))
+        url = '%s/lib/get_triggers.php' % (self.url,) 
         params = {}
         if show_seen == True:
             params["show_seen"] = 1
@@ -283,21 +283,6 @@ class Job(object):
         """
         return self.set_status(job_id, 'canceled')
 
-    def delete(self, job_id):
-        """
-        Deletes the given job.
-        """
-
-        url = '/'.join((self.url, 'lib', 'delete_job.php'))
-        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        headers = self.set_cookie(headers)
-
-        params = {'job_id': job_id}
-        resp, content = self.http.request(url, 'POST', urlencode(params),
-                                          headers=headers)
-
-        return resp, content
-
     def params(self, job_id):
         """
         Returns a dictionary of the job parameters
@@ -321,7 +306,7 @@ class Job(object):
         """
         Retries the errored tasks for the given job ID.
         """
-        url = '/'.join((self.url, 'lib', 'retry_errors.php'))
+        url = '%s/lib/retry_errors.php' % (self.url,)
         data = urlencode({'job_id': job_id})
         url = '?'.join((url, data))
 
@@ -339,7 +324,7 @@ class Job(object):
         """
         Sets the job status for the given job
         """
-        url = '/'.join((self.url, 'lib', 'set_job_status.php'))
+        url = '%s/lib/set_job_status.php' % (self.url,)
         data = urlencode(dict(job_id=job_id, status=status))
         url = '?'.join((url, data))
 
@@ -349,7 +334,7 @@ class Job(object):
         """
         Submit a job to Zync
         """
-        url = '/'.join((self.url, 'lib', 'submit_job_v2.php'))
+        url = '%s/lib/submit_job_v2.php' % (self.url,)
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
         submit_params = {}
@@ -373,11 +358,13 @@ class Job(object):
         resp, content = self.http.request(url, 'POST', urlencode(submit_params),
                                           headers=headers)
 
-        # if submit_job.php fails, a failure string will be returned,
-        # we want to raise that so that users can deal with it
-        # (if it works, nothing will be returned)
+        #
+        #   A return code of 0 means the submission succeeded. Return the job ID.
+        #   Otherwise, an error occurred, and the response field contains the error
+        #   message; raise an error with that message.
+        #
         response_obj = load_json(content)
-        if response_obj['code'] == 1:
+        if response_obj['code'] != 0:
             raise ZyncError('Could not submit job: %s' % (response_obj["response"],))
         return response_obj['response']
  

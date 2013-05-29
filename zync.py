@@ -151,10 +151,10 @@ class Zync(HTTPBackend):
         """
         Returns a list of all of the jobs on Zync
         """
-        url  = '/'.join((self.url, 'lib', 'get_jobs.php'))
+        url  = '/'.join((ZYNC_URL, 'lib', 'get_jobs.php'))
         params = dict(max=max)
         url = '?'.join((url, urlencode(params)))
-        resp, content = self.http.request(url, 'GET')
+        resp, content = self.http.request(url, 'GET', headers=headers) 
 
         return load_json(content)
 
@@ -206,13 +206,19 @@ class Zync(HTTPBackend):
             raise ZyncError('Could not retrieve list of enabled features: %s' % (response_obj["response"],))
         return response_obj['response']
 
+    def get_job_params(self, jobid):
+        url = '%s/lib/get_job_params.php?job_id=%d' % (ZYNC_URL,jobid,)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        return content
+
     def submit_job(self, job_type, *args, **kwargs):
         job_type = job_type.lower()
 
         JobSelect = NukeJob if job_type == 'nuke' else MayaJob
         self.job = JobSelect(self.cookie, self.url)
 
-        self.job.submit(*args, **kwargs)
+        return self.job.submit(*args, **kwargs)
 
     def submit(self, *args, **kwargs):
         """
@@ -343,7 +349,7 @@ class Job(object):
         """
         Submit a job to Zync
         """
-        url = '/'.join((self.url, 'lib', 'submit_job.php'))
+        url = '/'.join((self.url, 'lib', 'submit_job_v2.php'))
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
         submit_params = {}
@@ -370,11 +376,11 @@ class Job(object):
         # if submit_job.php fails, a failure string will be returned,
         # we want to raise that so that users can deal with it
         # (if it works, nothing will be returned)
-        if content:
-            raise ZyncError( content )
-        else:
-            return resp, content
-
+        response_obj = load_json(content)
+        if response_obj['code'] == 1:
+            raise ZyncError('Could not submit job: %s' % (response_obj["response"],))
+        return response_obj['response']
+ 
     def unpause(self, job_id):
         """
         Unpauses the given job ID.

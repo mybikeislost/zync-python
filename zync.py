@@ -16,6 +16,9 @@ class ZyncAuthenticationError(Exception):
 class ZyncError(Exception):
     pass
 
+class ZyncPreflightError(Exception):
+    pass
+
 config_path = os.path.dirname(__file__)
 if config_path != '':
     config_path += '/'
@@ -212,21 +215,6 @@ class Zync(HTTPBackend):
         resp, content = self.http.request(url, 'GET', headers=headers)
         return content
 
-    def submit_job(self, job_type, *args, **kwargs):
-        job_type = job_type.lower()
-
-        JobSelect = NukeJob if job_type == 'nuke' else MayaJob
-        self.job = JobSelect(self.cookie, self.url)
-
-        return self.job.submit(*args, **kwargs)
-
-    def submit(self, *args, **kwargs):
-        """
-        Wraps the submit method for the initialized job object.
-        See the documentation for `NukeJob.submit()` and `MayaJob.submit()`
-        """
-        return self.job.submit(*args, **kwargs)
-
     def get_triggers(self, user=None, show_seen=False):
         """
         Returns a list of current trigger events in ZYNC
@@ -240,17 +228,43 @@ class Zync(HTTPBackend):
         if user != None:
             params["user"] = user
         url = '?'.join((url, urlencode(params)))
-        resp, content = self.http.request(url, 'GET')
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
 
         return json.loads(content)
 
+    def submit_job(self, job_type, *args, **kwargs):
+        job_type = job_type.lower()
+
+        if job_type == 'nuke':
+            JobSelect = NukeJob
+        elif job_type == 'maya':
+            JobSelect = MayaJob
+        else:
+            raise ZyncError('Unrecognized job_type "%s".' % (job_type,))
+
+        self.job = JobSelect(self.cookie, self.url)
+
+        # run job.preflight(). if preflight does not succeed, an error will be
+        # thrown, so no need to check output here.
+        self.job.preflight()
+
+        return self.job.submit(*args, **kwargs)
+
+    def submit(self, *args, **kwargs):
+        """
+        Wraps the submit method for the initialized job object.
+        See the documentation for `NukeJob.submit()` and `MayaJob.submit()`
+        """
+        return self.job.submit(*args, **kwargs)
+
 class Job(object):
     """
-    Zync Job class
+    ZYNC Job class
     """
     def __init__(self, cookie, url):
         """
-        The base Zync Job object, not useful on its own, but should be
+        The base ZYNC Job object, not useful on its own, but should be
         the parent for app specific Job implementations.
         """
         if cookie:
@@ -260,8 +274,9 @@ class Job(object):
 
         self.url = url
         self.http = zync_lib.httplib2.Http()
+        self.job_type = None
 
-    def set_cookie(self, headers, cookie=None):
+    def set_cookie(self, headers={}, cookie=None):
         """
         Adds the auth cookie to the given headers, raises
         ZyncAuthenticationError if cookie doesn't exist
@@ -330,6 +345,71 @@ class Job(object):
 
         return self.http.request(url, 'GET')
 
+    def get_preflight_checks(self):
+        if self.job_type == None:
+            raise ZyncError('job_type parameter not set. This is probably because your subclass of Job doesn\'t define it.')
+        url = '%s/lib/get_preflight_checks.php?job_type=%s' % (self.url, self.job_type) 
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        content_obj = json.loads( content )
+        if content_obj["code"] == 0:
+            return content_obj["response"]
+        else:
+            raise ZyncError('Could not retrieve list of preflight checks: %s' % (content_obj['response'],)) 
+
+    def preflight(self):
+        """
+        Run the Job's preflight, which performs checks for common mistakes before
+        submitting the job to ZYNC.
+        """
+        #
+        #   Get the list of preflight checks.
+        #
+        preflight_list = self.get_preflight_checks()
+        #
+        #   Set up the environment needed to run the API commands passed to us.
+        #
+        #   TODO: can we move these into the Job subclasses? kind of annoying to have
+        #         app-specific code here, but AFAIK the imports have to happen in this
+        #         function in order to persist.
+        #
+        if len(preflight_list) > 0:
+            if self.job_type == 'maya':
+                import maya.cmds as cmds
+            elif self.job_type == 'nuke':
+                import nuke
+        #
+        #   Run the preflight checks.
+        #
+        for preflight_obj in preflight_list:
+            matches = []
+            try:
+                #
+                #   eval() the API code passed to us, which must return either a string or a list.
+                #
+                api_result = eval( preflight_obj['api_call'] )
+                #
+                #   If its a string, turn it into a list.
+                #
+                if isinstance(api_result, basestring):
+                    api_result = [ api_result ]
+                #
+                #   Look through the API result to see if the result meets the conditions laid
+                #   out by the check.
+                #
+                for result_item in api_result:
+                    if preflight_obj['operation_type'] == 'equal' and result_item in preflight_obj['condition']:
+                        matches.append( result_item )
+                    elif preflight_obj['operation_type'] == 'not_equal' and result_item not in preflight_obj['condition']:
+                        matches.append( result_item )
+            except Exception as e:
+                continue
+            #
+            #   If there were any conditions matched, raise a ZyncPreflightError.
+            #
+            if len(matches) > 0:
+                raise ZyncPreflightError(preflight_obj['error'].replace('%match%', ', '.join(matches)))
+
     def submit(self, params):
         """
         Submit a job to Zync
@@ -353,7 +433,7 @@ class Job(object):
             submit_params['scene_info'] = json.dumps(submit_params['scene_info'])
             print submit_params['scene_info']
 
-        headers = self.set_cookie(headers)
+        headers = self.set_cookie(headers=headers)
 
         resp, content = self.http.request(url, 'POST', urlencode(submit_params),
                                           headers=headers)
@@ -382,6 +462,7 @@ class NukeJob(Job):
     """
     def __init__(self, *args):
         super(NukeJob, self).__init__(*args)
+        self.job_type = 'nuke'
 
     def submit(self, script_path, write_name, params=None):
         """
@@ -391,8 +472,6 @@ class NukeJob(Job):
             write_node: The write node to render. Can be 'All' to render
                         all nodes.
         """
-        #script_path = os.path.realpath(script_path)
-
         submit_params = {}
         submit_params['job_type'] = 'Nuke'
         submit_params['write_node'] = write_name
@@ -410,6 +489,7 @@ class MayaJob(Job):
     """
     def __init__(self, *args):
         super(MayaJob, self).__init__(*args)
+        self.job_type = 'maya'
 
     def submit(self, file, layers, params=None):
         """
@@ -432,8 +512,6 @@ class MayaJob(Job):
             'vray': V-Ray
             'mr': Mental Ray
         """
-        #file = os.path.realpath(file)
-
         submit_params = {}
         submit_params['job_type'] = 'Maya'
         submit_params['file'] = file

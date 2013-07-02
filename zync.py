@@ -34,23 +34,14 @@ for key in required_config:
         raise Exception('config.py must define a value for %s.' % (key,))
 
 DEFAULT_INSTANCE_TYPE = 'ZYNC20'
-
-VRAY_RENDERER = 'vray'
-SOFTWARE_RENDERER = 'sw'
-MENTAL_RAY_RENDERER = 'mr'
 MAYA_DEFAULT_RENDERER = 'vray'
-MAYA_RENDERERS = {
-                    SOFTWARE_RENDERER: 'Maya Software',
-                    VRAY_RENDERER: 'V-Ray',
-                    MENTAL_RAY_RENDERER: 'Mental Ray'
-                 }
 
 def load_json(content):
     """
     Load JSON from ZYNC, taking care to strip characters that the json module 
     can't parse correctly.
     """
-    # get_jobs.php doesn't return standard parseable JSON, so strip out the
+    # some API scripts don't return standard parseable JSON, so strip out the
     # open/close parens
     if content.startswith('(') and content.endswith(')'):
         content = content.strip('(')
@@ -149,6 +140,7 @@ class Zync(HTTPBackend):
         self.CONFIG = self.get_config()
         self.INSTANCE_TYPES = self.get_instance_types()
         self.FEATURES = self.get_enabled_features()
+        self.MAYA_RENDERERS = self.get_maya_renderers()
 
     def list(self, max=100, app=None):
         """
@@ -207,6 +199,15 @@ class Zync(HTTPBackend):
         response_obj = load_json(content)
         if response_obj['code'] == 1:
             raise ZyncError('Could not retrieve list of enabled features: %s' % (response_obj["response"],))
+        return response_obj['response']
+
+    def get_maya_renderers(self):
+        url = '%s/lib/get_maya_renderers.php' % (self.url,)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        response_obj = load_json(content)
+        if response_obj['code'] == 1:
+            raise ZyncError('Could not retrieve list of Maya renderers: %s' % (response_obj["response"],))
         return response_obj['response']
 
     def get_job_params(self, job_id):

@@ -390,9 +390,9 @@ class Job(object):
                 #
                 api_result = eval( preflight_obj['api_call'] )
                 #
-                #   If its a string, turn it into a list.
+                #   If its not a list or a tuple, turn it into a list.
                 #
-                if isinstance(api_result, basestring):
+                if (not type(api_result) is list) and (not type(api_result) is tuple):
                     api_result = [ api_result ]
                 #
                 #   Look through the API result to see if the result meets the conditions laid
@@ -400,9 +400,9 @@ class Job(object):
                 #
                 for result_item in api_result:
                     if preflight_obj['operation_type'] == 'equal' and result_item in preflight_obj['condition']:
-                        matches.append( result_item )
+                        matches.append( str(result_item) )
                     elif preflight_obj['operation_type'] == 'not_equal' and result_item not in preflight_obj['condition']:
-                        matches.append( result_item )
+                        matches.append( str(result_item) )
             except Exception as e:
                 continue
             #

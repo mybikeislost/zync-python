@@ -153,18 +153,26 @@ class Zync(HTTPBackend):
 
         return load_json(content)
 
+    def get_project_list(self):
+        url = '%s/lib/get_project_list.php' % (self.url,)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        return load_json(content)
+
     def get_project_name(self, in_file):
         """
         Takes the name of a file - either a Maya or Nuke script - and returns
         the name of the project it belongs to.
         """
-        url = '%s/lib/get_project_name.php?file=%s' % (self.url, in_file)
+        params = {'file': in_file}
+        url = '%s/lib/get_project_name.php?%s' % (self.url, urlencode(params))
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         return load_json(content)
 
     def get_maya_output_path(self, in_file):
-        url = '%s/lib/get_maya_output.php?file=%s' % (self.url, in_file)
+        params = {'file': in_file}
+        url = '%s/lib/get_maya_output.php?%s' % (self.url, urlencode(params))
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         return load_json(content)
@@ -179,7 +187,8 @@ class Zync(HTTPBackend):
             except ValueError:
                 raise ZyncError(content)
         else:
-            url += '?var=%s' % (var,)
+            params = {'var': var}
+            url += '?%s' % (urlencode(params),)
             resp, content = self.http.request(url, 'GET', headers=headers)
             return content
 
@@ -211,7 +220,8 @@ class Zync(HTTPBackend):
         return response_obj['response']
 
     def get_job_params(self, job_id):
-        url = '%s/lib/get_job_params.php?job_id=%d' % (self.url, job_id)
+        params = {'job_id': job_id}
+        url = '%s/lib/get_job_params.php?%s' % (self.url, urlencode(params))
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         return content
@@ -349,7 +359,8 @@ class Job(object):
     def get_preflight_checks(self):
         if self.job_type == None:
             raise ZyncError('job_type parameter not set. This is probably because your subclass of Job doesn\'t define it.')
-        url = '%s/lib/get_preflight_checks.php?job_type=%s' % (self.url, self.job_type) 
+        params = {'job_type': self.job_type}
+        url = '%s/lib/get_preflight_checks.php?%s' % (self.url, urlencode(params)) 
         headers = self.set_cookie()
         resp, content = self.http.request(url, 'GET', headers=headers)
         content_obj = json.loads( content )

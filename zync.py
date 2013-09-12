@@ -379,7 +379,9 @@ class Job(object):
         #
         preflight_list = self.get_preflight_checks()
         #
-        #   Set up the environment needed to run the API commands passed to us.
+        #   Set up the environment needed to run the API commands passed to us. If
+        #   Exceptions occur when loading the app APIs, return, as we're probably
+        #   running in an external script and don't have access to the API.
         #
         #   TODO: can we move these into the Job subclasses? kind of annoying to have
         #         app-specific code here, but AFAIK the imports have to happen in this
@@ -387,9 +389,15 @@ class Job(object):
         #
         if len(preflight_list) > 0:
             if self.job_type == 'maya':
-                import maya.cmds as cmds
+                try:
+                    import maya.cmds as cmds
+                except:
+                    return
             elif self.job_type == 'nuke':
-                import nuke
+                try:
+                    import nuke
+                except:
+                    return
         #
         #   Run the preflight checks.
         #

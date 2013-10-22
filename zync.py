@@ -53,7 +53,7 @@ class HTTPBackend(object):
     """
     Methods for talking to services over http.
     """
-    def __init__(self, script_name, token, timeout=2.0):
+    def __init__(self, script_name, token, timeout=10.0):
         """
         """
         self.url = ZYNC_URL
@@ -131,7 +131,7 @@ class Zync(HTTPBackend):
     The entry point to the ZYNC service. Initialize this with your username
     and password.
     """
-    def __init__(self, script_name, token, timeout=2.0):
+    def __init__(self, script_name, token, timeout=10.0):
         """
         Create a Zync object, for interacting with the ZYNC service
         """

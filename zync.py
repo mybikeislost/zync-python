@@ -33,7 +33,7 @@ for key in required_config:
     if not key in globals():
         raise Exception('config.py must define a value for %s.' % (key,))
 
-DEFAULT_INSTANCE_TYPE = 'ZYNC20'
+DEFAULT_INSTANCE_TYPE = 'ZYNC16'
 MAYA_DEFAULT_RENDERER = 'vray'
 
 def load_json(content):

@@ -141,6 +141,7 @@ class Zync(HTTPBackend):
         self.INSTANCE_TYPES = self.get_instance_types()
         self.FEATURES = self.get_enabled_features()
         self.MAYA_RENDERERS = self.get_maya_renderers()
+        self.JOB_SUBTYPES = self.get_job_subtypes()
 
     def list(self, max=100, app=None):
         """
@@ -198,7 +199,7 @@ class Zync(HTTPBackend):
         resp, content = self.http.request(url, 'GET', headers=headers)
         response_obj = load_json(content)
         if response_obj['code'] == 1:
-            raise ZyncError('Could not retrieve list of instance types: %s' % (response_obj["response"],))
+            raise ZyncError('Could not retrieve list of instance types: %s' % (response_obj['response'],))
         return response_obj['response']
 
     def get_enabled_features(self):
@@ -207,7 +208,7 @@ class Zync(HTTPBackend):
         resp, content = self.http.request(url, 'GET', headers=headers)
         response_obj = load_json(content)
         if response_obj['code'] == 1:
-            raise ZyncError('Could not retrieve list of enabled features: %s' % (response_obj["response"],))
+            raise ZyncError('Could not retrieve list of enabled features: %s' % (response_obj['response'],))
         return response_obj['response']
 
     def get_maya_renderers(self):
@@ -216,7 +217,16 @@ class Zync(HTTPBackend):
         resp, content = self.http.request(url, 'GET', headers=headers)
         response_obj = load_json(content)
         if response_obj['code'] == 1:
-            raise ZyncError('Could not retrieve list of Maya renderers: %s' % (response_obj["response"],))
+            raise ZyncError('Could not retrieve list of Maya renderers: %s' % (response_obj['response'],))
+        return response_obj['response']
+
+    def get_job_subtypes(self):
+        url = '%s/lib/get_job_subtypes.php' % (self.url,)
+        headers = self.set_cookie()
+        resp, content = self.http.request(url, 'GET', headers=headers)
+        response_obj = load_json(content)
+        if response_obj['code'] == 1:
+            raise ZyncError('Could not retrieve list of Job Types: %s' % (response_obj['response'],))
         return response_obj['response']
 
     def get_job_params(self, job_id):
@@ -446,6 +456,7 @@ class Job(object):
         submit_params['num_instances'] = 1
         submit_params['skip_check'] = 0
         submit_params['notify_complete'] = 0
+        submit_params['job_subtype'] = 'render'
 
         submit_params.update(params)
 
@@ -495,7 +506,6 @@ class NukeJob(Job):
         submit_params = {}
         submit_params['job_type'] = 'Nuke'
         submit_params['write_node'] = write_name
-
 	submit_params['file'] = script_path 
 
         if params:
@@ -511,7 +521,7 @@ class MayaJob(Job):
         super(MayaJob, self).__init__(*args)
         self.job_type = 'maya'
 
-    def submit(self, file, layers, params=None):
+    def submit(self, file, params=None):
         """
         Maya-specific submit parameters:
             project: Maya project directory
@@ -528,15 +538,13 @@ class MayaJob(Job):
             distributed: (V-Ray only) Turns on distributed rendering
 
         Available Renderers:
-            'sw' : Maya Software
             'vray': V-Ray
             'mr': Mental Ray
+            'arnold': Arnold
         """
         submit_params = {}
         submit_params['job_type'] = 'Maya'
         submit_params['file'] = file
-
-        submit_params['layers'] = layers
 
         if params:
             submit_params.update(params)

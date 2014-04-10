@@ -462,12 +462,13 @@ class Job(object):
 
         if 'scene_info' in submit_params:
             submit_params['scene_info'] = json.dumps(submit_params['scene_info'])
-            print submit_params['scene_info']
 
         headers = self.set_cookie(headers=headers)
 
         resp, content = self.http.request(url, 'POST', urlencode(submit_params),
                                           headers=headers)
+
+        
 
         #
         #   A return code of 0 means the submission succeeded. Return the job ID.
@@ -550,5 +551,4 @@ class MayaJob(Job):
             submit_params.update(params)
 
         return super(MayaJob, self).submit(submit_params)
-
 

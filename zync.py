@@ -4,16 +4,17 @@ ZYNC Python Library
 A module for interacting with ZYNC.
 """
 
-import json
-import zync_lib.httplib2
-import platform
+import sys, os, json, platform
 from urllib import urlencode
-import os
+import zync_lib.httplib2
 
 class ZyncAuthenticationError(Exception):
     pass
 
 class ZyncError(Exception):
+    pass
+
+class ZyncConnectionError(Exception):
     pass
 
 class ZyncPreflightError(Exception):
@@ -53,23 +54,27 @@ class HTTPBackend(object):
     """
     Methods for talking to services over http.
     """
-    def __init__(self, script_name, token, timeout=10.0):
+    def __init__(self, script_name, token, timeout=10.0, validate=True):
         """
         """
         self.url = ZYNC_URL
-        self.http = zync_lib.httplib2.Http(timeout=timeout) 
+        self.validate = validate
+        if self.validate:
+            self.http = zync_lib.httplib2.Http(timeout=timeout) 
+        else:
+            self.http = zync_lib.httplib2.Http(timeout=timeout, disable_ssl_certificate_validation=True) 
         self.script_name = script_name
         self.token = token
         if self.up():
             self.cookie = self.__auth(self.script_name, self.token)
         else:
-            raise ZyncError('ZYNC is down at URL: %s' % self.url)
+            raise ZyncConnectionError('ZYNC is down at URL: %s' % self.url)
 
     def login(self, username=None, password=None):
         if self.up():
             self.cookie = self.__auth(self.script_name, self.token, username=username, password=password)
         else:
-            raise ZyncError('ZYNC is down at URL: %s' % self.url)
+            raise ZyncConnectionError('ZYNC is down at URL: %s' % self.url)
 
     def up(self):
         """
@@ -106,7 +111,7 @@ class HTTPBackend(object):
             headers['Cookie'] = self.cookie
             return headers
         else:
-            raise ZyncAuthenticationError('ZYNC Auth Failed')
+            raise ZyncAuthenticationError('ZYNC Authentication failed.')
 
     def __auth(self, script_name, token, username=None, password=None):
         """
@@ -131,11 +136,25 @@ class Zync(HTTPBackend):
     The entry point to the ZYNC service. Initialize this with your username
     and password.
     """
-    def __init__(self, script_name, token, timeout=10.0):
+    def __init__(self, script_name, token, timeout=10.0, application=None):
         """
         Create a Zync object, for interacting with the ZYNC service
         """
-        super(Zync, self).__init__(script_name, token, timeout=timeout)
+
+        validate = True
+        if application == 'maya':
+            try:
+                import maya.mel
+                api_version = maya.mel.eval('about -api')
+                if api_version < 201400:
+                    print 'ZYNC WARNING: Disabling SSL validation to accomodate old Maya libraries. To re-enable validation, please use Maya 2014 or higher.'
+                    validate = False
+                else:
+                    validate = True
+            except:
+                validate = True
+            
+        super(Zync, self).__init__(script_name, token, timeout=timeout, validate=validate)
 
         self.CONFIG = self.get_config()
         self.INSTANCE_TYPES = self.get_instance_types()
@@ -264,7 +283,7 @@ class Zync(HTTPBackend):
         else:
             raise ZyncError('Unrecognized job_type "%s".' % (job_type,))
 
-        self.job = JobSelect(self.cookie, self.url)
+        self.job = JobSelect(self.cookie, self.url, validate=self.validate)
 
         # run job.preflight(). if preflight does not succeed, an error will be
         # thrown, so no need to check output here.
@@ -283,7 +302,7 @@ class Job(object):
     """
     ZYNC Job class
     """
-    def __init__(self, cookie, url):
+    def __init__(self, cookie, url, validate=True):
         """
         The base ZYNC Job object, not useful on its own, but should be
         the parent for app specific Job implementations.
@@ -294,7 +313,12 @@ class Job(object):
             raise ZyncAuthenticationError('ZYNC Auth Failed')
 
         self.url = url
-        self.http = zync_lib.httplib2.Http()
+        self.validate = validate
+        if self.validate:
+            self.http = zync_lib.httplib2.Http()
+        else:
+            self.http = zync_lib.httplib2.Http(disable_ssl_certificate_validation=True) 
+            print 'ZYNC WARNING: disabling SSL validation due to out-of-date system libraries. Please contact ZYNC Tech Support for more info on this issue.'
         self.job_type = None
 
     def set_cookie(self, headers={}, cookie=None):
@@ -492,8 +516,8 @@ class NukeJob(Job):
     """
     Encapsulates Nuke-specific Job functions
     """
-    def __init__(self, *args):
-        super(NukeJob, self).__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super(NukeJob, self).__init__(*args, **kwargs)
         self.job_type = 'nuke'
 
     def submit(self, script_path, write_name, params=None):
@@ -518,8 +542,8 @@ class MayaJob(Job):
     """
     Encapsulates Maya-specific job functions
     """
-    def __init__(self, *args):
-        super(MayaJob, self).__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super(MayaJob, self).__init__(*args, **kwargs)
         self.job_type = 'maya'
 
     def submit(self, file, params=None):
